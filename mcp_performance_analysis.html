@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP-Server性能测试分析报告</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-align: center;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .performance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .performance-table th,
+        .performance-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .performance-table th {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+        }
+
+        .performance-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .performance-table tr:hover {
+            background-color: #e3f2fd;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .highlight {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .warning {
+            background: linear-gradient(45deg, #ffc107, #fd7e14);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .conclusion {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .conclusion h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+
+        .conclusion ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .conclusion li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .conclusion li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .comparison-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .vs-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MCP-Server性能测试分析报告</h1>
+            <p>基于32C64G和48C64G配置的性能瓶颈分析 - 重点关注网关性能影响</p>
+        </div>
+
+        <div class="analysis-grid">
+            <div class="card">
+                <h2>📊 测试配置概览</h2>
+                <div class="metric">
+                    <span class="metric-label">测试场景</span>
+                    <span class="metric-value">2种</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">服务器配置</span>
+                    <span class="metric-value">32C64G & 48C64G</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">并发数范围</span>
+                    <span class="metric-value">500-800</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">测试方式</span>
+                    <span class="metric-value">经过网关 vs 直连</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🚀 RPS性能对比</h2>
+                <div class="metric">
+                    <span class="metric-label">经过网关最高RPS</span>
+                    <span class="metric-value warning">1388.02</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">直连最高RPS</span>
+                    <span class="metric-value">1525.64</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">网关RPS损失</span>
+                    <span class="metric-value warning">-9.0%</span>
+                </div>
+                <p style="margin-top: 15px; color: #666;">经过网关RPS下降约9%，但整体RPS并不高，说明瓶颈主要在MCP-Server本身</p>
+            </div>
+
+            <div class="card">
+                <h2>⚡ 延迟分析</h2>
+                <div class="metric">
+                    <span class="metric-label">经过网关最低延迟</span>
+                    <span class="metric-value">314.4ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">直连最低延迟</span>
+                    <span class="metric-value highlight">286.36ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">延迟优化</span>
+                    <span class="metric-value">-8.9%</span>
+                </div>
+                <p style="margin-top: 15px; color: #666;">直连方式延迟更低，网关增加了约28ms的额外延迟</p>
+            </div>
+
+            <div class="card">
+                <h2>🔧 CPU使用率分析</h2>
+                <div class="metric">
+                    <span class="metric-label">32C服务器理论最大</span>
+                    <span class="metric-value">3200%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">48C服务器理论最大</span>
+                    <span class="metric-value">4800%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">MCP-Server CPU使用率</span>
+                    <span class="metric-value highlight">3200%满载</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">网关CPU使用率</span>
+                    <span class="metric-value warning">仅165%</span>
+                </div>
+                <p style="margin-top: 15px; color: #666;">即使经过网关，MCP-Server的CPU也达到满载，说明瓶颈在服务端处理能力</p>
+            </div>
+        </div>
+
+        <div class="comparison-section">
+            <h2>📈 详细性能数据对比</h2>
+            
+            <h3>经过网关 (Higress) 测试结果</h3>
+            <table class="performance-table">
+                <thead>
+                    <tr>
+                        <th>服务器配置</th>
+                        <th>并发数</th>
+                        <th>RPS</th>
+                        <th>平均延迟(ms)</th>
+                        <th>网关CPU使用率(%)</th>
+                        <th>成功率(%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td rowspan="4">32C64G</td>
+                        <td>500</td>
+                        <td>1140.84</td>
+                        <td>382.12</td>
+                        <td>109.38</td>
+                        <td>99.27</td>
+                    </tr>
+                    <tr>
+                        <td>600</td>
+                        <td>1141.3</td>
+                        <td>457.44</td>
+                        <td>112.75</td>
+                        <td>99.14</td>
+                    </tr>
+                    <tr>
+                        <td>700</td>
+                        <td>1133.35</td>
+                        <td>536.21</td>
+                        <td>113.36</td>
+                        <td>98.98</td>
+                    </tr>
+                    <tr>
+                        <td>800</td>
+                        <td>1134.56</td>
+                        <td>610.97</td>
+                        <td>102.46</td>
+                        <td>98.83</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="4">48C64G</td>
+                        <td>500</td>
+                        <td class="highlight">1388.02</td>
+                        <td>314.4</td>
+                        <td>165.99</td>
+                        <td>99.40</td>
+                    </tr>
+                    <tr>
+                        <td>600</td>
+                        <td>1368.2</td>
+                        <td>383.68</td>
+                        <td>139.29</td>
+                        <td>99.27</td>
+                    </tr>
+                    <tr>
+                        <td>700</td>
+                        <td>1383.26</td>
+                        <td>443.18</td>
+                        <td>127.26</td>
+                        <td>99.16</td>
+                    </tr>
+                    <tr>
+                        <td>800</td>
+                        <td>1357.56</td>
+                        <td>512.97</td>
+                        <td>116.73</td>
+                        <td>99.02</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>直连MCP-Server测试结果</h3>
+            <table class="performance-table">
+                <thead>
+                    <tr>
+                        <th>服务器配置</th>
+                        <th>并发数</th>
+                        <th>RPS</th>
+                        <th>平均延迟(ms)</th>
+                        <th>服务CPU使用率(%)</th>
+                        <th>成功率(%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td rowspan="4">32C64G</td>
+                        <td>500</td>
+                        <td>1266.18</td>
+                        <td>343.58</td>
+                        <td>3176.19</td>
+                        <td>99.34</td>
+                    </tr>
+                    <tr>
+                        <td>600</td>
+                        <td>1268.92</td>
+                        <td>410.95</td>
+                        <td>3224.31</td>
+                        <td>99.21</td>
+                    </tr>
+                    <tr>
+                        <td>700</td>
+                        <td>1262.89</td>
+                        <td>480.82</td>
+                        <td>3222.42</td>
+                        <td>99.08</td>
+                    </tr>
+                    <tr>
+                        <td>800</td>
+                        <td>1267.82</td>
+                        <td>548.3</td>
+                        <td>3179.30</td>
+                        <td>98.95</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="4">48C64G</td>
+                        <td>500</td>
+                        <td class="highlight">1525.64</td>
+                        <td>286.36</td>
+                        <td>4831.56</td>
+                        <td>99.46</td>
+                    </tr>
+                    <tr>
+                        <td>600</td>
+                        <td>1518.26</td>
+                        <td>344.11</td>
+                        <td>4822.50</td>
+                        <td>99.34</td>
+                    </tr>
+                    <tr>
+                        <td>700</td>
+                        <td>1498.73</td>
+                        <td>406.99</td>
+                        <td>4824.20</td>
+                        <td>99.22</td>
+                    </tr>
+                    <tr>
+                        <td>800</td>
+                        <td>1524.11</td>
+                        <td>456.13</td>
+                        <td>4827.53</td>
+                        <td>99.13</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="conclusion">
+            <h2>🎯 关键发现与分析</h2>
+            <ul>
+                <li><strong>主要瓶颈在MCP-Server：</strong>直连情况下RPS也仅1525，说明瓶颈主要在MCP-Server服务本身的处理能力，而非网关</li>
+                <li><strong>网关影响有限：</strong>经过网关RPS下降约9%（1388 vs 1525），网关引入的性能损耗相对较小</li>
+                <li><strong>CPU已满载：</strong>无论是否经过网关，MCP-Server的CPU都达到了满载状态（~3200%），说明服务端已经充分利用了CPU资源</li>
+                <li><strong>网关CPU使用率低：</strong>网关CPU最高仅165%，远低于32C的理论最大值3200%，说明网关不是瓶颈</li>
+                <li><strong>整体RPS偏低：</strong>对于48C64G的高配置服务器，1525的RPS相对较低，可能存在以下问题：
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>MCP-Server应用层逻辑复杂，单个请求处理时间较长</li>
+                        <li>存在锁竞争或串行化瓶颈</li>
+                        <li>I/O密集型操作较多（数据库、网络调用等）</li>
+                        <li>内存带宽或其他硬件资源成为瓶颈</li>
+                    </ul>
+                </li>
+                <li><strong>延迟表现：</strong>网关增加约28ms延迟，在可接受范围内</li>
+                <li><strong>稳定性良好：</strong>所有场景成功率均超过98%</li>
+                <li><strong>优化建议：</strong>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>重点优化MCP-Server应用逻辑，减少单请求处理时间</li>
+                        <li>排查是否存在锁竞争、同步瓶颈</li>
+                        <li>优化数据库连接池、缓存策略</li>
+                        <li>考虑异步处理、批量处理等优化方案</li>
+                        <li>分析内存使用情况，排查是否存在内存瓶颈</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
